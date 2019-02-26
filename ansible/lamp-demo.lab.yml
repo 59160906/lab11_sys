@@ -1,0 +1,119 @@
+---
+- hosts: web
+  become: yes
+  become_user: root
+
+  tasks:
+  - name: Install php 7.3 remi repo
+    yum:
+      name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm 
+      state: present
+
+  - name: Import remi GPG key.
+    rpm_key:
+      key: http://rpms.remirepo.net/RPM-GPG-KEY-remi
+      state: present
+
+  - name: Install php 7.3
+    yum:
+      name: 
+        - php
+        - php-cli
+        - php-fpm
+        - php-mysqlnd
+        - php-zip
+        - php-devel
+        - php-gd
+        - php-mcrypt
+        - php-mbstring
+        - php-curl
+        - php-xml
+        - php-pear
+        - php-bcmath
+        - php-json
+      state: present
+      enablerepo: remi-php73
+
+  - name: Edit time Zone
+    lineinfile:
+      path: /etc/php.ini
+      regexp: 'date.timezone'
+      line: 'date.timezone=Asia/Bangkok'
+      backup: yes
+  
+  - name: enable service
+    service:
+      name: httpd
+      enabled: yes
+      
+  - name: enable firewalld service
+    service:
+      name: firewalld
+      enabled: yes
+
+  - name: Start httpd service
+    service:
+      name: httpd
+      state: started
+
+  - name: Start firewalld service
+    service:
+      name: firewalld
+      state: started
+
+  - name: Open firewalld
+    firewalld:
+       service: '{{ item }}'
+       permanent: yes
+       state: enabled
+    loop:
+        - "http" 
+        - "https" 
+
+  - name: Restart firewalld
+    service: 
+      name: firewalld 
+      state: restarted
+
+  - name: copy index.php to wed server
+    template:
+      src: 'template/index.php.j2'
+      dest: '/var/www/html/index.php'
+      owner: root
+      group: root
+      mode: 0755
+
+- hosts: db
+  become: yes
+  become_user: root
+  tasks:
+  - name: Install mariaDB-server
+    yum:
+      name: mariadb-server
+      state: present
+
+  - name: enable mariadb service
+    service:
+      name: mariadb
+      enabled: yes
+  
+  - name: enable firewalld service
+    service:
+      name: firewalld
+      enabled: yes
+
+  - name: Start Named service
+    service:
+      name: mariadb
+      state: started
+
+  - name: Open firewalld
+    firewalld:
+       port: "3306/tcp"
+       permanent: yes
+       state: enabled
+
+  - name: Restart firewalld
+    service: 
+      name: firewalld 
+      state: restarted

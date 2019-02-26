@@ -1,14 +1,10 @@
 ---
-- hosts: web
+- hosts: wed
   become: yes
   become_user: root
   tasks:
-  - name: Install Apache
-    yum: name=httpd state=latest
-  - name: Install MariaDB
-    yum: name=mariadb-server state=latest
-  - name: Install PHP5
-    yum: name=php state=latest
+  - name: Install NTP Server
+    yum: name=htp state=latest
   - name: Start the Apache server
     service: name=httpd state=started
   - name: Install firewalld
@@ -19,3 +15,7 @@
     firewalld: service=http permanent=yes state=enabled
   - name: Restart firewalld
     service: name=firewalld state=restarted
+  - name: Start ntp
+    service: name=ntpd state=started
+  - name: set timezone to Asia/Bangkok
+    timezone: name=Asia/Bangkok
