@@ -1,0 +1,9 @@
+NameVirtualHost *:80
+
+<VirtualHost *:80>
+    ServerName web-01.my-site-01.com
+    ServerAlias my-site-01.com
+    DocumentRoot /var/www/my-site-01.com/html
+    ErrorLog /var/www/my-site-01.com/log/error.log
+    CustomLog /var/www/my-site-01.com/log/requests.log combined
+</VirtualHost>

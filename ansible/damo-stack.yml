@@ -1,0 +1,217 @@
+---
+- hosts: all
+  become: yes
+  become_user: root
+  tasks:
+  - name: Install Bind at ansible-mgn
+    yum:
+      name: bind
+      state: latest
+    when: ansible_connection == 'local'
+
+  - name: Edit nameserver listem IP Address
+    lineinfile:
+      path: /etc/named.conf
+      regexp: 'listen-on port 53 { 127.0.0.1; };'
+      line: 'listen-on port 53 { 127.0.0.1; 192.168.100.11; };'
+      backup: yes
+    when: ansible_connection == 'local'
+
+  - name: Edit nameserver allow query
+    lineinfile:
+      path: /etc/named.conf
+      regexp: 'allow-query     { localhost; };'
+      line: 'allow-query { any; };'
+      backup: yes
+    when: ansible_connection == 'local'
+
+  - name: Edit nameserver include
+    lineinfile:
+      path: /etc/named.conf
+      line: 'include "/etc/named/named.conf.local";'
+      backup: yes
+    when: ansible_connection == 'local'
+
+  - name: Install Package 
+    template: 
+      src: template/named.conf.local.j2
+      dest: /etc/named/named.conf.local
+      owner: root
+      group: root
+      mode: '0755'
+      backup: yes
+    when: ansible_connection == 'local'
+
+  - name: Create Zones directory in /etc/named
+    file:
+      path: /etc/named/zones
+      state: directory
+      mode: 0755
+    when: ansible_connection == 'local'
+
+  - name: copy forward and revest zone file to /etc/named/zones
+    template:
+      src: '{{ item.source }}'
+      dest: '{{ item.destination }}'
+      owner: root
+      group: root
+      mode: "0755"
+    loop:
+    - { source: 'template/db.mynet-906.com.j2', destination: '/etc/named/zones/db.mynet-906.com' }
+    - { source: 'template/db.192.168.100.j2', destination: '/etc/named/zones/db.192.168.100' }
+    - { source: 'template/db.my-site.com.j2', destination: '/etc/named/zones/db.my-site.com' }
+    when: ansible_connection == 'local'
+
+  - name: Start Named service
+    service:
+      name: named
+      state: started
+    when: ansible_connection == 'local'
+
+  - name: Start firewalld service
+    service:
+      name: firewalld
+      state: started
+    when: ansible_connection == 'local'
+
+  - name: Open firewalld
+    firewalld:
+       port: '{{ item }}'
+       permanent: yes
+       state: enabled
+    loop:
+        - "53/udp" 
+        - "53/tcp" 
+    when: ansible_connection == 'local'
+
+  - name: Restart firewalld
+    service: 
+      name: firewalld 
+      state: restarted
+    when: ansible_connection == 'local'
+
+  - name: Copy resolv file 
+    template:
+     src: template/resolv.conf.j2
+     dest: /etc/resolv.conf
+     owner: root
+     group: root
+     mode: "0644"
+
+  - name: Install Bind-Utils all Server
+    yum:
+       name: bind-utils
+       state: latest
+
+- hosts: web
+  become: yes
+  become_user: root
+
+  tasks:
+  - name: Install php 7.3 remi repo
+    yum:
+      name: http://rpms.remirepo.net/enterprise/remi-release-7.rpm 
+      state: present
+
+  - name: Import remi GPG key.
+    rpm_key:
+      key: http://rpms.remirepo.net/RPM-GPG-KEY-remi
+      state: present
+
+  - name: Install php 7.3
+    yum:
+      name: 
+        - httpd
+        - php
+        - php-curl
+      state: present
+      enablerepo: remi-php73
+
+  - name: Edit time Zone
+    lineinfile:
+      path: /etc/php.ini
+      regexp: 'date.timezone'
+      line: 'date.timezone=Asia/Bangkok'
+      backup: yes
+  
+  - name: enable service
+    service:
+      name: httpd
+      enabled: yes
+      
+  - name: enable firewalld service
+    service:
+      name: firewalld
+      enabled: yes
+
+  - name: Start httpd service
+    service:
+      name: httpd
+      state: started
+
+  - name: Start firewalld service
+    service:
+      name: firewalld
+      state: started
+
+  - name: Open firewalld
+    firewalld:
+       service: '{{ item }}'
+       permanent: yes
+       state: enabled
+    loop:
+        - "http" 
+        - "https" 
+
+  - name: Restart firewalld
+    service: 
+      name: firewalld 
+      state: restarted
+
+  - name: Create directory
+    file:
+      path: /var/www/{{ item }}
+      state: directory
+      mode: 0755
+    loop:
+      - my-site.com/html
+      - my-site.com/log
+      - mynet-906.com/http
+      - mynet-906.com/log
+
+  - name: copy mysite and mynet server02
+    template:
+      src: '{{ item.source }}'
+      dest: '{{ item.destination }}'
+      owner: root
+      group: root
+      mode: "0755"
+    loop:
+    - { source: 'template/my-site-01.com.conf.j2', destination: '/etc/httpd/conf.d/my-site.com.conf' }
+    - { source: 'template/mynet-906-01.com.conf.j2', destination: '/etc/httpd/conf.d/mynet-906.com.conf' }
+    when: ansible_ssh_host == 'server-02'
+
+  - name: copy mysite and mynet server03
+    template:
+      src: '{{ item.source }}'
+      dest: '{{ item.destination }}'
+      owner: root
+      group: root
+      mode: "0755"
+    loop:
+    - { source: 'template/my-site-02.com.conf.j2', destination: '/etc/httpd/conf.d/my-site.com.conf' }
+    - { source: 'template/mynet-906-02.com.conf.j2', destination: '/etc/httpd/conf.d/mynet-906.com.conf' }
+    when: ansible_ssh_host == 'server-03'
+
+  - name: copy index.php to wed server
+    template:
+      src: 'template/index.php.j2'
+      dest: '/var/www/html/index.php'
+      owner: root
+      group: root
+      mode: 0755
+
+  - name: Restart httpd service
+    service:
+      name: httpd
+      state: restarted
