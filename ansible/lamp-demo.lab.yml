@@ -37,7 +37,7 @@
   - name: Edit time Zone
     lineinfile:
       path: /etc/php.ini
-      regexp: 'date.timezone'
+      regexp: ';date.timezone'
       line: 'date.timezone=Asia/Bangkok'
       backup: yes
   
