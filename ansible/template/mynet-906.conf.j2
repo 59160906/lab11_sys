@@ -7,6 +7,7 @@ server {
   listen 80;
   server_name mynet-906.com www.mynet-906.com;
   proxy_set_header Host $http_host;
+  access_log syslog:server=192.168.100.11:514,facility=local7,tag=nginx_mynet,severity=info; 
   location / {
     proxy_pass http://mynet;
   }
